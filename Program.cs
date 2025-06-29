@@ -4,15 +4,14 @@ using System.Collections.Generic;
 class Program
 {
     static List<string> tasks = new List<string>();
-    static int maxTaskCount;      // Максимальное количество задач
-    static int maxTaskLength;     // Максимальная длина задачи
+    static int maxTaskCount;       // Максимальное количество задач
+    static int maxTaskLength;      // Максимальная длина задачи
 
     static void Main()
     {
         try
         {
-            // Устанавливаем пределы прямо при запуске программы,
-            // однако теперь они будут запрашиваться заново, если введено неправильное значение
+            // Установка предельных значений прямо при запуске программы
             maxTaskCount = GetMaxTaskCount();
             maxTaskLength = GetMaxTaskLength();
 
@@ -105,6 +104,8 @@ class Program
             Console.WriteLine(ex.Message);
         }
     }
+
+    // Остальные методы сохраняются без изменений
 
     // Метод начальной регистрации пользователя
     private static void Start(ref string userName, ref bool isNameSet)
@@ -246,7 +247,7 @@ class Program
         {
             if (tasks.Count > 0)
             {
-                ShowTasks(userName, true); // Показываем список перед выбором
+                ShowTasks(userName, true); // показываем список перед выбором
 
                 Console.Write("Введите номер задачи для удаления: ");
                 int index;
@@ -279,7 +280,7 @@ class Program
         }
     }
 
-    // Циклический запрос для установления максимального количества задач
+    // Запрашивает ограничение на количество задач
     private static int GetMaxTaskCount()
     {
         while (true)
@@ -297,7 +298,7 @@ class Program
         }
     }
 
-    // Циклический запрос для установления максимальной длины задачи
+    // Запрашивает максимальную длину задачи
     private static int GetMaxTaskLength()
     {
         while (true)
@@ -315,7 +316,7 @@ class Program
         }
     }
 
-    // Парсинг и проверка числа
+    // Проверяет числовое значение и диапазон
     public static int ParseAndValidateInt(string? str, int min, int max)
     {
         if (int.TryParse(str, out int result) && result >= min && result <= max)
@@ -325,7 +326,7 @@ class Program
         throw new ArgumentException($"Значение должно быть числом между {min} и {max}.");
     }
 
-    // Проверка строки
+    // Проверяет валидность строки
     public static void ValidateString(string? str)
     {
         if (string.IsNullOrWhiteSpace(str))
@@ -334,23 +335,23 @@ class Program
         }
     }
 
-    // Классы пользовательских исключений
+    // Пользовательские исключения
 
-    // Исключение при превышении лимита задач
+    // Превышение ограничения на количество задач
     public class TaskCountLimitException : Exception
     {
         public TaskCountLimitException(int taskCountLimit) : base($"Превышено максимальное количество задач равное {taskCountLimit}")
         { }
     }
 
-    // Исключение при превышении длины задачи
+    // Превышение ограничения на длину задачи
     public class TaskLengthLimitException : Exception
     {
         public TaskLengthLimitException(int taskLength, int taskLengthLimit) : base($"Длина задачи ({taskLength}) превышает максимально допустимое значение {taskLengthLimit}")
         { }
     }
 
-    // Исключение при дублировании задач
+    // Задача уже существует
     public class DuplicateTaskException : Exception
     {
         public DuplicateTaskException(string task) : base($"Задача '{task}' уже существует.")
