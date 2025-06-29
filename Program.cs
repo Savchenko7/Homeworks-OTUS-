@@ -4,58 +4,116 @@ using System.Collections.Generic;
 class Program
 {
     static List<string> tasks = new List<string>();
+    static int maxTaskCount;      // Максимальное количество задач
+    static int maxTaskLength;     // Максимальная длина задачи
+
     static void Main()
     {
-        string userName = "";
-        bool isNameSet = false;
-
-        // Приветственное сообщение при запуске программы
-        Console.WriteLine("Добро пожаловать в бот! Доступные команды: /start, /help, /info, /addtask, /showtasks, /removetask, /exit");
-
-        while (true)
+        try
         {
-            Console.Write("Введите команду: ");
-            string inputCommand = Console.ReadLine().Trim(); // Удаляем лишние пробелы
+            // Устанавливаем пределы прямо при запуске программы,
+            // однако теперь они будут запрашиваться заново, если введено неправильное значение
+            maxTaskCount = GetMaxTaskCount();
+            maxTaskLength = GetMaxTaskLength();
 
-            if (inputCommand.StartsWith("/"))
+            string userName = "";
+            bool isNameSet = false;
+
+            Console.WriteLine("Добро пожаловать в бот! Доступные команды: /start, /help, /info, /echo, /addtask, /showtasks, /removetask, /exit");
+
+            while (true)
             {
-                HandleCommand(inputCommand, ref userName, ref isNameSet);
+                Console.Write("Введите команду: ");
+                string inputCommand = Console.ReadLine().Trim();
+
+                if (inputCommand.StartsWith("/"))
+                {
+                    HandleCommand(inputCommand, ref userName, ref isNameSet);
+                }
+                else
+                {
+                    Console.WriteLine("Команда должна начинаться с символа '/'. Повторите попытку.");
+                }
             }
-            else
+        }
+        catch (Exception ex)
+        {
+            // Общий блок обработки неожиданных ошибок
+            Console.WriteLine($"Произошла непредвиденная ошибка: Type={ex.GetType().Name}, Message={ex.Message}");
+            if (ex.InnerException != null)
             {
-                Console.WriteLine("Команда должна начинаться с символа '/'. Повторите попытку.");
+                Console.WriteLine($"Inner Exception: Type={ex.InnerException.GetType().Name}, Message={ex.InnerException.Message}");
             }
+            Console.WriteLine(ex.StackTrace);
         }
     }
 
+    // Основная логика обработки команд
     private static void HandleCommand(string command, ref string userName, ref bool isNameSet)
     {
-        var parts = command.Split(' ', 2); // Делим строку на команду и её аргумент
-        string cmd = parts.Length > 0 ? parts[0].ToLower() : ""; // Получаем саму команду
-        string arg = parts.Length > 1 ? parts[1].Trim() : null; // Аргумент (если есть)
+        var parts = command.Split(' ', 2);
+        string cmd = parts.Length > 0 ? parts[0].ToLower() : "";
+        string arg = parts.Length > 1 ? parts[1].Trim() : null;
 
-        switch (cmd)
+        try
         {
-            case "/start": Start(ref userName, ref isNameSet); break;
-            case "/help": Help(userName, isNameSet); break;
-            case "/info": Info(userName, isNameSet); break;
-            case "/echo": Echo(userName, isNameSet, arg); break;
-            case "/exit": Exit(userName, isNameSet); break;
-            case "/addtask": AddTask(userName, isNameSet); break;
-            case "/showtasks": ShowTasks(userName, isNameSet); break;
-            case "/removetask": RemoveTask(userName, isNameSet); break;
-            default: Default(userName, isNameSet); break;
+            switch (cmd)
+            {
+                case "/start":
+                    Start(ref userName, ref isNameSet);
+                    break;
+                case "/help":
+                    Help(userName, isNameSet);
+                    break;
+                case "/info":
+                    Info(userName, isNameSet);
+                    break;
+                case "/echo":
+                    Echo(userName, isNameSet, arg);
+                    break;
+                case "/exit":
+                    Exit(userName, isNameSet);
+                    break;
+                case "/addtask":
+                    AddTask(userName, isNameSet);
+                    break;
+                case "/showtasks":
+                    ShowTasks(userName, isNameSet);
+                    break;
+                case "/removetask":
+                    RemoveTask(userName, isNameSet);
+                    break;
+                default:
+                    Default(userName, isNameSet);
+                    break;
+            }
+        }
+        catch (TaskCountLimitException ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        catch (TaskLengthLimitException ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        catch (DuplicateTaskException ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            Console.WriteLine(ex.Message);
         }
     }
 
-    // Метод для команды /start
+    // Метод начальной регистрации пользователя
     private static void Start(ref string userName, ref bool isNameSet)
     {
         if (!isNameSet)
         {
             Console.Write("Введите ваше имя: ");
             userName = Console.ReadLine().Trim();
-            isNameSet = !string.IsNullOrWhiteSpace(userName); // Проверка наличия имени
+            isNameSet = !string.IsNullOrWhiteSpace(userName);
             if (isNameSet)
             {
                 Console.WriteLine($"Привет, {userName}! Чем могу помочь?");
@@ -71,7 +129,7 @@ class Program
         }
     }
 
-    // Метод для команды /help
+    // Справочник команд
     private static void Help(string userName, bool isNameSet)
     {
         Console.WriteLine(isNameSet
@@ -80,7 +138,7 @@ class Program
         );
     }
 
-    // Метод для команды /info
+    // Информационная справка о версии
     private static void Info(string userName, bool isNameSet)
     {
         Console.WriteLine(
@@ -90,7 +148,7 @@ class Program
         );
     }
 
-    // Метод для команды /echo
+    // Простое эхо-сообщение
     private static void Echo(string userName, bool isNameSet, string arg)
     {
         if (isNameSet)
@@ -106,17 +164,17 @@ class Program
         }
     }
 
-    // Метод для команды /exit
+    // Закрытие программы
     private static void Exit(string userName, bool isNameSet)
     {
         Console.WriteLine(isNameSet
             ? $"{userName}, выход из программы. До свидания!"
             : "До свидания!"
         );
-        Environment.Exit(0); // Завершаем программу
+        Environment.Exit(0);
     }
 
-    // Метод для обработки неправильных команд
+    // Сообщение при неизвестной команде
     private static void Default(string userName, bool isNameSet)
     {
         Console.WriteLine(isNameSet
@@ -125,13 +183,30 @@ class Program
         );
     }
 
-    // Новая команда для добавления задачи
+    // Метод для добавления задачи
     private static void AddTask(string userName, bool isNameSet)
     {
         if (isNameSet)
         {
+            if (tasks.Count >= maxTaskCount)
+            {
+                throw new TaskCountLimitException(maxTaskCount);
+            }
+
             Console.Write("Введите описание задачи: ");
             string taskDescription = Console.ReadLine().Trim();
+            ValidateString(taskDescription);
+
+            if (taskDescription.Length > maxTaskLength)
+            {
+                throw new TaskLengthLimitException(taskDescription.Length, maxTaskLength);
+            }
+
+            if (tasks.Contains(taskDescription))
+            {
+                throw new DuplicateTaskException(taskDescription);
+            }
+
             tasks.Add(taskDescription);
             Console.WriteLine($"Задача \"{taskDescription}\" добавлена.");
         }
@@ -141,7 +216,7 @@ class Program
         }
     }
 
-    // Команда для вывода текущего списка задач
+    // Просмотр списка задач
     private static void ShowTasks(string userName, bool isNameSet)
     {
         if (isNameSet)
@@ -164,7 +239,7 @@ class Program
         }
     }
 
-    // Команда для удаления задачи
+    // Удаление задачи
     private static void RemoveTask(string userName, bool isNameSet)
     {
         if (isNameSet)
@@ -181,26 +256,104 @@ class Program
                     {
                         string removedTask = tasks[index - 1];
                         tasks.RemoveAt(index - 1);
-                        Console.WriteLine($"Задача \"{removedTask}\" удалена.");
+                        Console.WriteLine($"Задача №{index}: '{removedTask}' удалена.");
                     }
                     else
                     {
-                        Console.WriteLine("Вы указали некорректный номер задачи.");
+                        Console.WriteLine("Указанный индекс вне диапазона.");
                     }
                 }
                 else
                 {
-                    Console.WriteLine("Некорректный ввод числа. Пожалуйста, введите число.");
+                    Console.WriteLine("Ошибка формата индекса.");
                 }
             }
             else
             {
-                Console.WriteLine("Список задач пуст.");
+                Console.WriteLine("Нет задач для удаления.");
             }
         }
         else
         {
             Console.WriteLine("Сначала представьтесь командой /start.");
         }
+    }
+
+    // Циклический запрос для установления максимального количества задач
+    private static int GetMaxTaskCount()
+    {
+        while (true)
+        {
+            Console.Write("Введите максимально допустимое количество задач (от 1 до 100): ");
+            string input = Console.ReadLine();
+            try
+            {
+                return ParseAndValidateInt(input, 1, 100);
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+    }
+
+    // Циклический запрос для установления максимальной длины задачи
+    private static int GetMaxTaskLength()
+    {
+        while (true)
+        {
+            Console.Write("Введите максимально допустимую длину задачи (от 1 до 100 символов): ");
+            string input = Console.ReadLine();
+            try
+            {
+                return ParseAndValidateInt(input, 1, 100);
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+    }
+
+    // Парсинг и проверка числа
+    public static int ParseAndValidateInt(string? str, int min, int max)
+    {
+        if (int.TryParse(str, out int result) && result >= min && result <= max)
+        {
+            return result;
+        }
+        throw new ArgumentException($"Значение должно быть числом между {min} и {max}.");
+    }
+
+    // Проверка строки
+    public static void ValidateString(string? str)
+    {
+        if (string.IsNullOrWhiteSpace(str))
+        {
+            throw new ArgumentException("Строка не должна быть пустой или состоять только из пробелов.");
+        }
+    }
+
+    // Классы пользовательских исключений
+
+    // Исключение при превышении лимита задач
+    public class TaskCountLimitException : Exception
+    {
+        public TaskCountLimitException(int taskCountLimit) : base($"Превышено максимальное количество задач равное {taskCountLimit}")
+        { }
+    }
+
+    // Исключение при превышении длины задачи
+    public class TaskLengthLimitException : Exception
+    {
+        public TaskLengthLimitException(int taskLength, int taskLengthLimit) : base($"Длина задачи ({taskLength}) превышает максимально допустимое значение {taskLengthLimit}")
+        { }
+    }
+
+    // Исключение при дублировании задач
+    public class DuplicateTaskException : Exception
+    {
+        public DuplicateTaskException(string task) : base($"Задача '{task}' уже существует.")
+        { }
     }
 }
