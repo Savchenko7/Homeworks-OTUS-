@@ -5,10 +5,10 @@ VisualStudioVersion = 17.13.35913.81
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Homeworks (OTUS)", "Homeworks (OTUS).csproj", "{B915CA98-250F-45E4-8142-189D5154AD73}"
 	ProjectSection(ProjectDependencies) = postProject
-		{9DF96A2E-62CF-114B-017D-7CD1FE7D7223} = {9DF96A2E-62CF-114B-017D-7CD1FE7D7223}
+		{2FE62F59-B268-526A-162E-A9C5E95F78FB} = {2FE62F59-B268-526A-162E-A9C5E95F78FB}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Otus.ToDoList.ConsoleBot", "Otus.ToDoList.ConsoleBot\Otus.ToDoList.ConsoleBot.csproj", "{9DF96A2E-62CF-114B-017D-7CD1FE7D7223}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Otus.ToDoList.ConsoleBot", "..\Homeworks\05.2 ООП интерфейсы\Otus.ToDoList.ConsoleBot\Otus.ToDoList.ConsoleBot.csproj", "{2FE62F59-B268-526A-162E-A9C5E95F78FB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,10 +20,10 @@ Global
 		{B915CA98-250F-45E4-8142-189D5154AD73}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B915CA98-250F-45E4-8142-189D5154AD73}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B915CA98-250F-45E4-8142-189D5154AD73}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9DF96A2E-62CF-114B-017D-7CD1FE7D7223}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9DF96A2E-62CF-114B-017D-7CD1FE7D7223}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9DF96A2E-62CF-114B-017D-7CD1FE7D7223}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9DF96A2E-62CF-114B-017D-7CD1FE7D7223}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2FE62F59-B268-526A-162E-A9C5E95F78FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2FE62F59-B268-526A-162E-A9C5E95F78FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2FE62F59-B268-526A-162E-A9C5E95F78FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2FE62F59-B268-526A-162E-A9C5E95F78FB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
