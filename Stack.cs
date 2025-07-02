@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-public class StackItem
+﻿public class StackItem
 {
     internal string Value { get; set; }
     internal StackItem Previous { get; set; }
