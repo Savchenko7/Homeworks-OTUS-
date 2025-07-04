@@ -1,4 +1,8 @@
-﻿// Core/Services/UserService.cs
+﻿
+//реализация интерфейса для работы с пользователями.
+
+using Homeworks__OTUS_;
+
 public class UserService : IUserService
 {
     private readonly IUserRepository _repository;

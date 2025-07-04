@@ -1,5 +1,12 @@
-﻿public interface IUserService
+﻿
+
+//интерфейс для работы с пользователями (регистрация, поиск).
+
+namespace Homeworks__OTUS_
 {
-    ToDoUser RegisterUser(long telegramUserId, string telegramUserName);
-    ToDoUser? GetUser(long telegramUserId);
+    public interface IUserService
+    {
+        ToDoUser RegisterUser(long telegramUserId, string telegramUserName);
+        ToDoUser? GetUser(long telegramUserId);
+    }
 }

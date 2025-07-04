@@ -1,4 +1,5 @@
-﻿// Core/DataAccess/IUserRepository.cs
+﻿
+//интерфейс для работы с пользователями (создание, чтение и поиск пользователей).
 public interface IUserRepository
 {
     ToDoUser? GetUser(Guid userId);

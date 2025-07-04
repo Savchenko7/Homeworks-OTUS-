@@ -1,4 +1,5 @@
-﻿// Core/DataAccess/IToDoRepository.cs
+﻿
+//интерфейс для работы с задачами (добавление, удаление, поиск и фильтрация задач).
 public interface IToDoRepository
 {
     IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId);
@@ -10,4 +11,5 @@ public interface IToDoRepository
     bool ExistsByName(Guid userId, string name);
     int CountActive(Guid userId);
     IReadOnlyList<ToDoItem> Find(Guid userId, Func<ToDoItem, bool> predicate);
+   
 }

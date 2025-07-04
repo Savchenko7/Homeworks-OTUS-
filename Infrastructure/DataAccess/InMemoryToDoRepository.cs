@@ -1,4 +1,5 @@
-﻿// Infrastructure/DataAccess/InMemoryToDoRepository.cs
+﻿
+//реализация интерфейса IToDoRepository для работы с задачами
 public class InMemoryToDoRepository : IToDoRepository
 {
     private readonly List<ToDoItem> _todos = new List<ToDoItem>();
