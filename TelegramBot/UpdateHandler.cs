@@ -12,302 +12,298 @@ namespace Homeworks__OTUS_
         private readonly ITelegramBotClient _botClient;
         private readonly IUserService _userService;
         private readonly IToDoService _toDoService;
-        private readonly IToDoRepository _toDoRepository; // Добавляем репозиторий задач
+        private readonly IToDoRepository _toDoRepository;
 
-        public UpdateHandler(ITelegramBotClient botClient, IUserService userService, IToDoService toDoService, IToDoRepository toDoRepository)
+        // Делегаты и события
+        public delegate void MessageEventHandler(string message);
+        public event MessageEventHandler? OnHandleUpdateStarted;
+        public event MessageEventHandler? OnHandleUpdateCompleted;
+
+        public UpdateHandler(
+            ITelegramBotClient botClient,
+            IUserService userService,
+            IToDoService toDoService,
+            IToDoRepository toDoRepository)
         {
             _botClient = botClient;
             _userService = userService;
             _toDoService = toDoService;
-            _toDoRepository = toDoRepository; // Инициализируем репозиторий
+            _toDoRepository = toDoRepository;
         }
-
-        // Реализуем интерфейс IUpdateHandler правильно, возвращая void
-        public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
+        // Реализация метода HandleErrorAsync
+        public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+        {
+            await botClient.SendMessage(new Chat { Id = 1 }, "Возникла ошибка: " + exception.Message, cancellationToken);
+        }
+        public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
             try
             {
-                if (update.Message != null && update.Message.Text != null)
+                if (update.Message != null && !string.IsNullOrEmpty(update.Message.Text))
                 {
-                    ProcessMessage(update.Message).GetAwaiter().GetResult(); 
+                    OnHandleUpdateStarted?.Invoke(update.Message.Text); // Начали обрабатывать сообщение
+
+                    await ProcessMessage(update.Message, cancellationToken);
+
+                    OnHandleUpdateCompleted?.Invoke(update.Message.Text); // Завершаем обработку сообщения
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Ничего не делаем
             }
             catch (Exception ex)
             {
-                _botClient.SendMessage(update.Message.Chat, $"Произошла ошибка: {ex.Message}");
+                await HandleErrorAsync(ex, cancellationToken); // Добавляем CancellationToken
             }
         }
 
-        private async Task ProcessMessage(Message message)
+        public async Task HandleErrorAsync(Exception exception, CancellationToken cancellationToken)
+        {
+            await _botClient.SendMessage(new Chat { Id = 1 }, "Возникла ошибка: " + exception.Message, cancellationToken);
+        }
+
+        private async Task ProcessMessage(Message message, CancellationToken cancellationToken)
         {
             if (message.Text.StartsWith('/'))
             {
                 var parts = message.Text.Split(' ', 2);
-                string cmd = parts.Length > 0 ? parts[0].ToLower() : "";
-                string? arg = parts.Length > 1 ? parts[1].Trim() : null;
+                string command = parts.Length > 0 ? parts[0].ToLower() : "";
+                string argument = parts.Length > 1 ? parts[1].Trim() : null;
 
                 // Получаем пользователя
-                ToDoUser? user = _userService.GetUser(message.From.Id);
+                ToDoUser? user = await _userService.GetUserAsync(message.From.Id, cancellationToken);
 
                 // Регистрация пользователя при команде /start
-                if (cmd == "/start")
+                 if (command == "/start")
                 {
                     if (user == null)
                     {
-                        user = _userService.RegisterUser(message.From.Id, message.From.Username ?? "");
-                        _botClient.SendMessage(message.Chat, $"Привет, {user.TelegramUserName}! Ты успешно зарегистрирован.");
+                        user =await _userService.RegisterUserAsync(message.From.Id, message.From.Username ?? "", cancellationToken);
+                       await _botClient.SendMessage(message.Chat, $"Привет, {user.TelegramUserName}! Вы успешно зарегистрированы.", cancellationToken);
                     }
                     else
                     {
-                        _botClient.SendMessage(message.Chat, $"Привет, {user.TelegramUserName}!");
+                       await _botClient.SendMessage(message.Chat, $"Привет, {user.TelegramUserName}!", cancellationToken);
                     }
                     return;
                 }
 
-                // Незарегистрированным пользователям доступно только /help и /info
+
+                // Незарегистрированный пользователь видит только команды /help и /info
                 if (user == null)
                 {
-                    if (cmd == "/help" || cmd == "/info")
+                    if (command == "/help" || command == "/info")
                     {
-                        await ExecutePublicCommand(cmd, message, user);
+                        await ExecutePublicCommand(command, message, user, cancellationToken);
                     }
                     else
                     {
-                        _botClient.SendMessage(message.Chat, "Вы не зарегистрированы. Для использования программы зарегистрируйтесь командой /start.\n" +
+                        await _botClient.SendMessage(message.Chat, "Вы не зарегистрированы. Для использования программы зарегистрируйтесь командой /start.\n" +
                                                             "Доступны только команды:\n" +
                                                             "/help - показать помощь\n" +
-                                                            "/info - получить информацию о приложении");
+                                                            "/info - получить информацию о приложении", cancellationToken);
                     }
                     return;
                 }
 
-                // Зарегистрированным пользователям доступны все команды
-                switch (cmd)
+                  // Обработка команд зарегистрированных пользователей
+                switch (command)
                 {
                     case "/help":
-                        await OnHelp(message, user);
+                        await OnHelp(message, user, cancellationToken);
                         break;
                     case "/info":
-                        await OnInfo(message, user);
+                        await OnInfo(message, user, cancellationToken);
                         break;
                     case "/addtask":
-                        await OnAddTask(message, user, arg);
+                        await OnAddTask(message, user, argument, cancellationToken);
                         break;
                     case "/showtasks":
-                        await OnShowTasks(message, user);
+                        await OnShowTasks(message, user, cancellationToken);
                         break;
                     case "/removetask":
-                        await OnRemoveTask(message, user, arg);
+                        await OnRemoveTask(message, user, argument, cancellationToken);
                         break;
                     case "/completetask":
-                        await OnCompleteTask(message, user, arg);
+                        await OnCompleteTask(message, user, argument, cancellationToken);
                         break;
                     case "/showalltasks":
-                        await OnShowAllTasks(message, user);
+                        await OnShowAllTasks(message, user, cancellationToken);
                         break;
-                    case "/report": // Добавляем обработку команды /report
-                        await OnReport(message, user);
+                    case "/report":
+                        await OnReport(message, user, cancellationToken);
                         break;
-                    case "/find": // Добавляем обработку команды /find
-                        await OnFind(message, user, arg);
+                    case "/find":
+                        await OnFind(message, user, argument, cancellationToken);
                         break;
                     default:
-                        _botClient.SendMessage(message.Chat, "Команды не найдено. Используйте /help для помощи.");
+                        await _botClient.SendMessage(message.Chat, "Команды не найдено. Используйте /help для справки.", cancellationToken);
                         break;
                 }
             }
             else
             {
-                // Сообщение не начинается с '/', выводим подсказку
-                _botClient.SendMessage(message.Chat, "Команда должна начинаться с символа '/'");
-            }
-            try
-            {
-                // Обработка команд...
-            }
-            catch (TaskCountLimitException ex)
-            {
-                _botClient.SendMessage(message.Chat, ex.Message);
-            }
-            catch (TaskLengthLimitException ex)
-            {
-                _botClient.SendMessage(message.Chat, ex.Message);
-            }
-            catch (Exception ex)
-            {
-               _botClient.SendMessage(message.Chat, $"Произошла ошибка: {ex.Message}");
+                 await _botClient.SendMessage(message.Chat, "Команда должна начинаться с символа '/'.", cancellationToken);
             }
         }
 
-        // Обрабатываем команды /help и /info специально для незарегистрированных пользователей
-        private async Task ExecutePublicCommand(string cmd, Message message, ToDoUser? user)
+        private async Task ExecutePublicCommand(string cmd, Message message, ToDoUser? user, CancellationToken cancellationToken)
         {
             switch (cmd)
             {
                 case "/help":
-                    await OnHelp(message, user);
+                    await OnHelp(message, user, cancellationToken);
                     break;
                 case "/info":
-                    await OnInfo(message, user);
+                    await OnInfo(message, user, cancellationToken);
                     break;
             }
         }
 
-        // Обработчики команд
-        private void OnStart(Message message, ToDoUser user)
+        private async Task OnHelp(Message message, ToDoUser? user, CancellationToken cancellationToken)
         {
-            _botClient.SendMessage(message.Chat, $"Привет, {user.TelegramUserName}!"); // Без await
-        }
-
-        private async Task OnHelp(Message message, ToDoUser user)
-        {
-             _botClient.SendMessage(message.Chat, @"
-Доступные команды:
+            await _botClient.SendMessage(message.Chat, @"Доступные команды:
 /start - Приветствие
-/help - Показать помощь
-/info - Информация о приложении
-/addtask название-задачи - Добавить задачу
+/help - Справочная информация
+/info - Информационная справка
+/addtask Название_задачи - Добавить новую задачу
 /showtasks - Показать активные задачи
-/removetask номер-задачи - Удалить задачу
-/completetask guid-задачи - Завершить задачу
+/removetask ID_задачи - Удалить задачу
+/completetask ID_задачи - Завершить задачу
 /showalltasks - Показать все задачи
-/report - Показать статистику по задачам
-/find начало-названия - Найти задачи по названию
-");
+/report - Получить отчёт по задачам
+/find Поисковая фраза - Найти задачи по началу названия", cancellationToken);
         }
 
-        private async Task OnInfo(Message message, ToDoUser? user)
+        private async Task OnInfo(Message message, ToDoUser user, CancellationToken cancellationToken)
         {
-            if (user == null)
-            {
-                _botClient.SendMessage(message.Chat, "Версия программы: 1.0");
-            }
-            else
-            {
-                _botClient.SendMessage(message.Chat, "Версия программы: 1.0");
-            }
+            await _botClient.SendMessage(message.Chat, "Приложение ToDo-менеджер для отслеживания задач.", cancellationToken);
         }
 
-        private async Task OnAddTask(Message message, ToDoUser user, string? taskName)
+        private async Task OnAddTask(Message message, ToDoUser user, string? taskName, CancellationToken cancellationToken)
         {
-            
             if (string.IsNullOrWhiteSpace(taskName))
             {
-                _botClient.SendMessage(message.Chat, "Название задачи не может быть пустым.");
+                await _botClient.SendMessage(message.Chat, "Название задачи не должно быть пустым.", cancellationToken);
                 return;
             }
+
             try
             {
-                var addedItem = _toDoService.Add(user, taskName!);
-                _botClient.SendMessage(message.Chat, $"Задача добавлена: {addedItem.Name} - {addedItem.CreatedAt} - {addedItem.Id}");
+                var addedItem = await _toDoService.AddAsync(user, taskName!, cancellationToken);
+                await _botClient.SendMessage(message.Chat, $"Задача добавлена: {addedItem.Name} - {addedItem.CreatedAt} - {addedItem.Id}", cancellationToken);
+            }
+            catch (TaskLengthLimitException ex)
+            {
+                await _botClient.SendMessage(message.Chat, ex.Message, cancellationToken); // Сообщение о длине задачи
+            }
+            catch (TaskCountLimitException ex)
+            {
+                await _botClient.SendMessage(message.Chat, ex.Message, cancellationToken); // Сообщение о количестве задач
             }
             catch (DuplicateTaskException ex)
             {
-                 _botClient.SendMessage(message.Chat, ex.Message); // Сообщаем пользователю о дублировании
+                await _botClient.SendMessage(message.Chat, ex.Message, cancellationToken); // Сообщение о дубликате задачи
             }
         }
 
-        private async Task OnShowTasks(Message message, ToDoUser user)
+        private async Task OnShowTasks(Message message, ToDoUser user, CancellationToken cancellationToken)
         {
-            var activeTasks = _toDoService.GetActiveByUserId(user.UserId);
+            var activeTasks = await _toDoService.GetActiveByUserIdAsync(user.UserId, cancellationToken);
             if (activeTasks.Any())
             {
-                int idx = 1; // Номер задачи
+                int idx = 1;
                 foreach (var task in activeTasks)
                 {
-                    _botClient.SendMessage(message.Chat, $"{idx++}. {task.Name} - {task.CreatedAt} - {task.Id}");
+                    await _botClient.SendMessage(message.Chat, $"{idx++}. {task.Name} - {task.CreatedAt} - {task.Id}", cancellationToken);
                 }
             }
             else
             {
-                _botClient.SendMessage(message.Chat, "Активных задач нет.");
+                await _botClient.SendMessage(message.Chat, "Нет активных задач.", cancellationToken);
             }
         }
 
-        private async Task OnRemoveTask(Message message, ToDoUser user, string? taskNumberStr)
+        private async Task OnRemoveTask(Message message, ToDoUser user, string? taskIdStr, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(taskNumberStr))
+            if (string.IsNullOrWhiteSpace(taskIdStr))
             {
-                _botClient.SendMessage(message.Chat, "Номер задачи не указан.");
+                await _botClient.SendMessage(message.Chat, "Необходимо указать ID задачи.", cancellationToken);
                 return;
             }
 
-            if (!int.TryParse(taskNumberStr, out int taskNumber))
+            if (!Guid.TryParse(taskIdStr, out var taskId))
             {
-                _botClient.SendMessage(message.Chat, "Некорректный номер задачи.");
+                await _botClient.SendMessage(message.Chat, "Некорректный формат ID задачи.", cancellationToken);
                 return;
             }
 
-            // Получаем активный список задач
-            var activeTasks = _toDoService.GetActiveByUserId(user.UserId);
-            if (taskNumber > 0 && taskNumber <= activeTasks.Count)
-            {
-                var taskToDelete = activeTasks.ElementAt(taskNumber - 1); // Индекс начинается с нуля
-                _toDoService.Delete(taskToDelete.Id);
-                _botClient.SendMessage(message.Chat, "Задача успешно удалена.");
-            }
-            else
-            {
-                _botClient.SendMessage(message.Chat, "Некорректный номер задачи.");
-            }
+            await _toDoService.DeleteAsync(taskId, cancellationToken);
+            await _botClient.SendMessage(message.Chat, "Задача успешно удалена.", cancellationToken);
         }
 
-        private async Task OnCompleteTask(Message message, ToDoUser user, string? taskIdStr)
+        private async Task OnCompleteTask(Message message, ToDoUser user, string? taskIdStr, CancellationToken cancellationToken)
         {
-            if (Guid.TryParse(taskIdStr!, out var taskId))
+            if (string.IsNullOrWhiteSpace(taskIdStr))
             {
-                _toDoService.MarkCompleted(taskId);
-                _botClient.SendMessage(message.Chat, "Задача помечена как выполненная.");
+                await _botClient.SendMessage(message.Chat, "Необходимо указать ID задачи.", cancellationToken);
+                return;
             }
-            else
+
+            if (!Guid.TryParse(taskIdStr, out var taskId))
             {
-                _botClient.SendMessage(message.Chat, "Некорректный идентификатор задачи.");
+                await _botClient.SendMessage(message.Chat, "Некорректный формат ID задачи.", cancellationToken);
+                return;
             }
+
+            await _toDoService.MarkCompletedAsync(taskId, cancellationToken);
+            await _botClient.SendMessage(message.Chat, "Задача отмечена как завершённая.", cancellationToken);
         }
 
-        private async Task OnShowAllTasks(Message message, ToDoUser user)
+        private async Task OnShowAllTasks(Message message, ToDoUser user, CancellationToken cancellationToken)
         {
-            var allTasks = _toDoService.GetAllByUserId(user.UserId);
-            if (allTasks.Any())
+            var tasks = await _toDoService.GetAllByUserIdAsync(user.UserId, cancellationToken);
+            if (tasks.Any())
             {
-                foreach (var task in allTasks)
+                foreach (var task in tasks)
                 {
-                    _botClient.SendMessage(message.Chat, $"({task.State}) {task.Name} - {task.CreatedAt} - {task.Id}");
+                    await _botClient.SendMessage(message.Chat, $"{task.Name} ({task.State}) - {task.CreatedAt} - {task.Id}", cancellationToken);
                 }
             }
             else
             {
-                _botClient.SendMessage(message.Chat, "Задач нет.");
-            }
-        }
-        private async Task OnFind(Message message, ToDoUser user, string searchTerm)
-        {
-            if (searchTerm == null)
-            {
-                _botClient.SendMessage(message.Chat, "Введи текст для поиска после команды /find."); 
-                return;
-            }
-
-            var foundTodos = _toDoService.Find(user, searchTerm);
-            if (foundTodos.Any())
-            {
-                foreach (var todo in foundTodos)
-                {
-                    _botClient.SendMessage(message.Chat, $"{todo.Name} - {todo.CreatedAt} - {todo.Id}"); 
-                }
-            }
-            else
-            {
-                _botClient.SendMessage(message.Chat, "Задачи не найдены."); // Убираем await
+                await _botClient.SendMessage(message.Chat, "Нет задач.", cancellationToken);
             }
         }
 
-        private async Task OnReport(Message message, ToDoUser user)
+        private async Task OnReport(Message message, ToDoUser user, CancellationToken cancellationToken)
         {
             var reportService = new ToDoReportService(_toDoRepository);
-            var stats = reportService.GetUserStats(user.UserId);
-            _botClient.SendMessage(message.Chat, $"Статистика по задачам на {stats.GeneratedAt}:\nВсего: {stats.Total};\nЗавершенных: {stats.Completed};\nАктивных: {stats.Active};"); // Убираем await
+            var stats = await reportService.GetUserStatsAsync(user.UserId, cancellationToken);
+            await _botClient.SendMessage(message.Chat, $"Отчёт по задачам:\nВсего задач: {stats.Total}\nВыполнено: {stats.Completed}\nАктивно: {stats.Active}", cancellationToken);
         }
-        
+
+        private async Task OnFind(Message message, ToDoUser user, string? searchTerm, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                await _botClient.SendMessage(message.Chat, "Введите фразу для поиска.", cancellationToken);
+                return;
+            }
+
+            var results = await _toDoService.FindAsync(user.UserId, searchTerm!, cancellationToken);
+            if (results.Any())
+            {
+                foreach (var task in results)
+                {
+                    await _botClient.SendMessage(message.Chat, $"{task.Name} - {task.CreatedAt} - {task.Id}", cancellationToken);
+                }
+            }
+            else
+            {
+                await _botClient.SendMessage(message.Chat, "Задачи не найдены.", cancellationToken);
+            }
+        }
     }
 }

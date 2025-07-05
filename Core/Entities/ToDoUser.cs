@@ -1,5 +1,6 @@
 ﻿
 //класс, представляющий пользователя (идентификатор, имя, дата регистрации).
+
 public class ToDoUser
     {
         public Guid UserId { get; set; }
