@@ -6,7 +6,7 @@ namespace Homeworks__OTUS_
 {
     public interface IUserService
     {
-        ToDoUser RegisterUser(long telegramUserId, string telegramUserName);
-        ToDoUser? GetUser(long telegramUserId);
+        Task<ToDoUser?> GetUserAsync(long telegramUserId, CancellationToken cancellationToken);
+        Task<ToDoUser> RegisterUserAsync(long telegramUserId, string telegramUsername, CancellationToken cancellationToken);
     }
 }

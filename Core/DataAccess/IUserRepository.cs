@@ -1,8 +1,7 @@
 ﻿
 //интерфейс для работы с пользователями (создание, чтение и поиск пользователей).
 public interface IUserRepository
-{
-    ToDoUser? GetUser(Guid userId);
-    ToDoUser? GetUserByTelegramUserId(long telegramUserId);
-    void Add(ToDoUser user);
-}
+    {
+        Task<ToDoUser?> GetUserAsync(long telegramUserId, CancellationToken cancellationToken);
+        Task AddAsync(ToDoUser user, CancellationToken cancellationToken);
+    }

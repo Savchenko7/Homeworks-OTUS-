@@ -12,27 +12,22 @@ public class UserService : IUserService
         _repository = repository;
     }
 
-    public ToDoUser RegisterUser(long telegramUserId, string telegramUserName)
+    public async Task<ToDoUser?> GetUserAsync(long telegramUserId, CancellationToken cancellationToken)
     {
-        var existingUser = _repository.GetUserByTelegramUserId(telegramUserId);
-        if (existingUser != null)
-        {
-            return existingUser;
-        }
+        return await _repository.GetUserAsync(telegramUserId, cancellationToken);
+    }
 
-        var newUser = new ToDoUser
+    public async Task<ToDoUser> RegisterUserAsync(long telegramUserId, string telegramUsername, CancellationToken cancellationToken)
+    {
+        var user = new ToDoUser
         {
             UserId = Guid.NewGuid(),
             TelegramUserId = telegramUserId,
-            TelegramUserName = telegramUserName,
+            TelegramUserName = telegramUsername,
             RegisteredAt = DateTime.UtcNow
         };
-        _repository.Add(newUser);
-        return newUser;
-    }
 
-    public ToDoUser? GetUser(long telegramUserId)
-    {
-        return _repository.GetUserByTelegramUserId(telegramUserId);
+        await _repository.AddAsync(user, cancellationToken);
+        return user; // Возврат объекта
     }
 }
