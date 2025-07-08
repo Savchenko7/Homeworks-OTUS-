@@ -1,7 +1,5 @@
-﻿
-public class DuplicateTaskException : Exception
+﻿public class DuplicateTaskException : Exception
 {
     public DuplicateTaskException(string taskName)
-        : base($"Задача с названием '{taskName}' уже существует.")
-    { }
+        : base($"Задача с названием '{taskName}' уже существует.") { }
 }

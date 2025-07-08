@@ -1,7 +1,4 @@
-﻿
-
-//реализация интерфейса для генерации отчётов
-public class ToDoReportService : IToDoReportService
+﻿public class ToDoReportService : IToDoReportService
 {
     private readonly IToDoRepository _toDoRepository;
 

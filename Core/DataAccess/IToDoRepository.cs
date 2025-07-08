@@ -1,6 +1,4 @@
-﻿
-//интерфейс для работы с задачами (добавление, удаление, поиск и фильтрация задач).
-public interface IToDoRepository
+﻿public interface IToDoRepository
 {
     Task<IReadOnlyList<ToDoItem>> GetAllByUserIdAsync(Guid userId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ToDoItem>> GetActiveByUserIdAsync(Guid userId, CancellationToken cancellationToken);

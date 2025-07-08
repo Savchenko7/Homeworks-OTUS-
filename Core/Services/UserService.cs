@@ -1,9 +1,4 @@
-﻿
-//реализация интерфейса для работы с пользователями.
-
-using Homeworks__OTUS_;
-
-public class UserService : IUserService
+﻿public class UserService : IUserService
 {
     private readonly IUserRepository _repository;
 
@@ -28,6 +23,6 @@ public class UserService : IUserService
         };
 
         await _repository.AddAsync(user, cancellationToken);
-        return user; // Возврат объекта
+        return user;
     }
 }

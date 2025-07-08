@@ -1,11 +1,5 @@
-﻿//выбрасывается, если название задачи слишком длинное.
-
-namespace Homeworks__OTUS_.Core.Exceptions
+﻿public class TaskLengthLimitException : Exception
 {
-    public class TaskLengthLimitException : Exception
-    {
-        public TaskLengthLimitException(int maxLength)
-            : base($"Название задачи не может превышать {maxLength} символов.")
-        { }
-    }
+    public TaskLengthLimitException(int maxLength)
+        : base($"Длина названия задачи превышает допустимый максимум ({maxLength}) символов.") { }
 }
