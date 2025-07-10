@@ -1,17 +1,15 @@
-﻿
-//класс, представляющий задачу (идентификатор, владелец, название, статус, дата создания)
-public enum ToDoItemState
-    {
-        Active,
-        Completed
-    }
+﻿public enum ToDoItemState
+{
+    Active,
+    Completed
+}
 
-    public class ToDoItem
-    {
-        public Guid Id { get; set; }
-        public ToDoUser User { get; set; } = new ToDoUser(); // Устанавливаем начальное значение
-        public string Name { get; set; } = ""; // Устанавливаем пустую строку
-        public DateTime CreatedAt { get; set; }
-        public ToDoItemState State { get; set; }
-        public DateTime? StateChangedAt { get; set; }
-    }
+public class ToDoItem
+{
+    public Guid Id { get; set; }
+    public ToDoUser User { get; set; }
+    public string Name { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public ToDoItemState State { get; set; }
+    public DateTime? StateChangedAt { get; set; }
+}

@@ -1,6 +1,4 @@
-﻿
-//реализация интерфейса IUserRepository для работы с пользователями
-public class InMemoryUserRepository : IUserRepository
+﻿public class InMemoryUserRepository : IUserRepository
 {
     private readonly List<ToDoUser> _users = new List<ToDoUser>();
 
