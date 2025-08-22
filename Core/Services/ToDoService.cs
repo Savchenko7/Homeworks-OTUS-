@@ -1,10 +1,14 @@
 ﻿public class ToDoService : IToDoService
 {
     private readonly IToDoRepository _toDoRepository;
+    private readonly int _maxTasksPerUser;
+    private readonly int _maxTaskNameLength;
 
-    public ToDoService(IToDoRepository toDoRepository)
+    public ToDoService(IToDoRepository toDoRepository, int maxTasksPerUser, int maxTaskNameLength)
     {
         _toDoRepository = toDoRepository;
+        _maxTasksPerUser = maxTasksPerUser;
+        _maxTaskNameLength = maxTaskNameLength;
     }
 
     public async Task<IReadOnlyList<ToDoItem>> GetAllByUserIdAsync(Guid userId, CancellationToken cancellationToken)
@@ -19,19 +23,19 @@
 
     public async Task<ToDoItem> AddAsync(ToDoUser user, string name, CancellationToken cancellationToken)
     {
-        if (name.Length > 50)
-            throw new TaskLengthLimitException(50);
+        if (name.Length > _maxTaskNameLength)
+            throw new TaskLengthLimitException(_maxTaskNameLength);
 
         if (await _toDoRepository.ExistsByNameAsync(user.UserId, name, cancellationToken))
             throw new DuplicateTaskException(name);
 
-        if ((await _toDoRepository.CountActiveAsync(user.UserId, cancellationToken)) >= 10)
-            throw new TaskCountLimitException(10);
+        if ((await _toDoRepository.CountActiveAsync(user.UserId, cancellationToken)) >= _maxTasksPerUser)
+            throw new TaskCountLimitException(_maxTasksPerUser);
 
         var todo = new ToDoItem
         {
             Id = Guid.NewGuid(),
-            User = user,
+            ToDoUser = user,
             Name = name,
             CreatedAt = DateTime.UtcNow,
             State = ToDoItemState.Active

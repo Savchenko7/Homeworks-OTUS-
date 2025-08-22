@@ -1,4 +1,6 @@
-﻿using Telegram.Bot;
+﻿using System.Text.Json;
+using Telegram.Bot;
+using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -51,11 +53,11 @@ public class UpdateHandler : IUpdateHandler
     public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
     {
         Console.WriteLine($"Ошибка при обработке обновления: {exception.Message}");
+        Console.WriteLine(exception.StackTrace); // вывод полного трассировки ошибки
 
-        // Мы можем уведомить пользователя, используя информацию, если доступна такая возможность
         if (exception is Telegram.Bot.Exceptions.ApiRequestException apiEx && !string.IsNullOrEmpty(apiEx.Message))
         {
-            await botClient.SendMessage(-1 /* Здесь укажите реальный Chat ID */, "Возникла внутренняя ошибка. Попробуйте позже.", cancellationToken: cancellationToken);
+            await botClient.SendMessage(-1 /*Здесь укажите реальный Chat ID*/, "Возникла внутренняя ошибка. Попробуйте позже.", cancellationToken: cancellationToken);
         }
         else
         {
@@ -65,19 +67,30 @@ public class UpdateHandler : IUpdateHandler
 
     private async Task ProcessMessage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
     {
-        ToDoUser? user = await _userService.GetUserAsync(message.From.Id, cancellationToken);
-
-        if (user == null)
+        try
         {
-            await SendStartMenu(botClient, message.Chat.Id, cancellationToken);
-        }
-        else
-        {
-            await SendRegisteredMenu(botClient, message.Chat.Id, cancellationToken);
-        }
+            ToDoUser? user = await _userService.GetUserAsync(message.From.Id, cancellationToken);
 
-        await ProcessCommand(botClient, message, cancellationToken);
+            if (user == null)
+            {
+                await SendStartMenu(botClient, message.Chat.Id, cancellationToken);
+            }
+            else
+            {
+                await SendRegisteredMenu(botClient, message.Chat.Id, cancellationToken);
+            }
+
+            await ProcessCommand(botClient, message, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Ошибка при обработке сообщения: {ex.Message}");
+            Console.WriteLine(ex.StackTrace); // выводит полную трассировку ошибки
+
+            await botClient.SendMessage(message.Chat.Id, "Что-то пошло не так. Попробуйте ещё раз позже.", cancellationToken: cancellationToken);
+        }
     }
+
 
     private async Task SendStartMenu(ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
     {
@@ -259,7 +272,7 @@ public class UpdateHandler : IUpdateHandler
         }
     }
 
-    private async Task OnCompleteTask(Message message, ToDoUser user, string? taskIdStr, CancellationToken cancellationToken)
+       private async Task OnCompleteTask(Message message, ToDoUser user, string? taskIdStr, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(taskIdStr))
         {
@@ -302,8 +315,15 @@ public class UpdateHandler : IUpdateHandler
     private async Task OnReport(Message message, ToDoUser user, CancellationToken cancellationToken)
     {
         var stats = await _toDoReportService.GetUserStatsAsync(user.UserId, cancellationToken);
-        await _botClient.SendMessage(message.Chat.Id, $"Отчёт по вашим задачам:\nВсего задач: {stats.Total}\nВыполнено: {stats.Completed}\nАктивных: {stats.Active}",
-            cancellationToken: cancellationToken);
+        await _botClient.SendMessage(
+            message.Chat.Id,
+            $"Отчёт по вашим задачам:\n" +
+            $"Всего задач: {stats.Total}\n" +
+            $"Выполнено: {stats.Completed}\n" +
+            $"Активных: {stats.Active}\n" +
+            $"Сгенерировано: {stats.GeneratedAt}",
+            cancellationToken: cancellationToken
+        );
     }
 
     private async Task OnFind(Message message, ToDoUser user, string? searchQuery, CancellationToken cancellationToken)
