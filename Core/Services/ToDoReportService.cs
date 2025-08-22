@@ -1,7 +1,4 @@
-﻿
-
-//реализация интерфейса для генерации отчётов
-public class ToDoReportService : IToDoReportService
+﻿public class ToDoReportService : IToDoReportService
 {
     private readonly IToDoRepository _toDoRepository;
 
@@ -12,12 +9,13 @@ public class ToDoReportService : IToDoReportService
 
     public async Task<(int Total, int Completed, int Active, DateTime GeneratedAt)> GetUserStatsAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var todos = await _toDoRepository.GetAllByUserIdAsync(userId, cancellationToken);
+        var allItems = await _toDoRepository.GetAllByUserIdAsync(userId, cancellationToken);
+
         return (
-            Total: todos.Count,
-            Completed: todos.Count(t => t.State == ToDoItemState.Completed),
-            Active: todos.Count(t => t.State == ToDoItemState.Active),
-            GeneratedAt: DateTime.UtcNow
+            Total: allItems.Count,                             // Всего задач (без удалённых)
+            Completed: allItems.Count(t => t.State == ToDoItemState.Completed), // Количество завершенных задач
+            Active: allItems.Count(t => t.State == ToDoItemState.Active),      // Количество активных задач
+            GeneratedAt: DateTime.UtcNow                      // Дата генерации отчета
         );
     }
 
