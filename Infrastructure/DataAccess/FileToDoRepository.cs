@@ -113,7 +113,7 @@ public class FileToDoRepository : IToDoRepository
     {
         var indexRecords = await ReadFileIndex();
         var indexRecord = indexRecords.FirstOrDefault(record => record.ItemId == id);
-        
+
 
         var filePath = Path.Combine(_baseDirectory, indexRecord.UserId.ToString(), $"{id}.json");
         try

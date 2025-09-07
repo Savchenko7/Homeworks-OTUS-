@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Globalization;
+using System.Text.Json;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -12,14 +13,16 @@ public class UpdateHandler : IUpdateHandler
     private readonly IToDoService _toDoService;
     private readonly IToDoRepository _toDoRepository;
     private readonly IToDoReportService _toDoReportService;
+    private readonly IScenarioContextRepository _contextRepository;
 
-    public UpdateHandler(ITelegramBotClient botClient, IUserService userService, IToDoService toDoService, IToDoRepository toDoRepository, IToDoReportService toDoReportService)
+    public UpdateHandler(ITelegramBotClient botClient, IUserService userService, IToDoService toDoService, IToDoRepository toDoRepository, IToDoReportService toDoReportService, IScenarioContextRepository contextRepository)
     {
         _botClient = botClient;
         _userService = userService;
         _toDoService = toDoService;
         _toDoRepository = toDoRepository;
         _toDoReportService = toDoReportService;
+        _contextRepository = contextRepository;
     }
     // Объявляем делегат
     public delegate void MessageEventHandler(string message);
@@ -38,17 +41,33 @@ public class UpdateHandler : IUpdateHandler
     // Процесс обработки сообщений
     public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
-        if (update.Type == UpdateType.Message && update.Message?.Text != null)
+        // Логирование начала обработки сообщения
+        OnHandleUpdateStarted?.Invoke(update.Message.Text);
+
+        // Получаем контекст сценария пользователя
+        var context = await _contextRepository.GetContext(update.Message.From.Id, cancellationToken);
+
+        // Если присутствует активный сценарий
+        if (context != null)
         {
-            // Событие начала обработки
-            OnHandleUpdateStarted?.Invoke(update.Message.Text);
+            // Проверяем, не пришла ли команда /cancel
+            if (update.Message.Text == "/cancel")
+            {
+                // Сбрасываем контекст сценария
+                await _contextRepository.ResetContext(update.Message.From.Id, cancellationToken);
+                await botClient.SendMessage(update.Message.Chat.Id, "Действие отменено.", cancellationToken: cancellationToken);
+                return;
+            }
 
-            await ProcessMessage(botClient, update.Message, cancellationToken);
-
-            // Событие окончания обработки
-            OnHandleUpdateCompleted?.Invoke(update.Message.Text);
+            // Выполняем продолжение сценария
+            await ProcessScenario(context, update, cancellationToken);
+            return;
         }
+
+        // Основная логика обработки входящих сообщений
+        await ProcessMessage(botClient, update.Message, update, cancellationToken);
     }
+
 
     public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
     {
@@ -64,8 +83,65 @@ public class UpdateHandler : IUpdateHandler
             Console.WriteLine("Сообщение об ошибке невозможно передать пользователю.");
         }
     }
+    private async Task ProcessScenario(ScenarioContext context, Update update, CancellationToken ct) 
+    { 
+        var scenario = GetScenario(context.CurrentScenario);
+        var result = await scenario.HandleMessageAsync(_botClient, context, update, ct);
 
-    private async Task ProcessMessage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+        if (result == ScenarioResult.Completed) 
+        { 
+            await _contextRepository.ResetContext(context.UserId, ct); } 
+        else 
+        { 
+            await _contextRepository.SetContext(context.UserId, context, ct); 
+        } 
+    }
+    private IScenario GetScenario(ScenarioType type)
+    {
+        switch (type)
+        {
+            case ScenarioType.AddTask:
+                return new AddTaskScenario(_userService, _toDoService);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(type), type, "Сценарий не поддерживается");
+        }
+    }
+    public class AddTaskScenario : IScenario 
+    { 
+        private readonly IUserService _userService; 
+        private readonly IToDoService _toDoService; 
+        public AddTaskScenario(IUserService userService, IToDoService toDoService) 
+        { 
+            _userService = userService;
+            _toDoService = toDoService; 
+        } 
+        public bool CanHandle(ScenarioType scenario) => scenario == ScenarioType.AddTask; 
+        public async Task<ScenarioResult> HandleMessageAsync(ITelegramBotClient bot, ScenarioContext context, Update update, CancellationToken ct) 
+        { 
+            var message = update.Message!.Text!; 
+            switch (context.CurrentStep) { case null: var user = await _userService.GetUserAsync(update.Message.From.Id, ct);
+                    context.Data["CurrentUser"] = user; await bot.SendMessage(update.Message.Chat.Id, "Введите название задачи:", cancellationToken: ct); 
+                    context.CurrentStep = "Name"; 
+                    return ScenarioResult.Transition; 
+                case "Name": var taskName = message; 
+                    context.Data["TaskName"] = taskName; 
+                    await bot.SendMessage(update.Message.Chat.Id, "Введите срок выполнения задачи (ДД.ММ.ГГГГ):", cancellationToken: ct); 
+                    context.CurrentStep = "Deadline"; 
+                    return ScenarioResult.Transition; 
+                case "Deadline": 
+                    if (!DateTime.TryParseExact(message, "dd.MM.yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var deadline)) 
+                    { 
+                        await bot.SendMessage(update.Message.Chat.Id, "Некорректный формат даты. Повторите ввод.", cancellationToken: ct); return ScenarioResult.Transition; 
+                    } 
+                    var userFromContext = (ToDoUser)context.Data["CurrentUser"]; 
+                    var taskNameFromContext = (string)context.Data["TaskName"]; 
+                    await _toDoService.AddAsync(userFromContext, taskNameFromContext, deadline, ct); 
+                    await bot.SendMessage(update.Message.Chat.Id, "Задача успешно добавлена!", cancellationToken: ct); 
+                    return ScenarioResult.Completed; default: return ScenarioResult.Completed; 
+            } 
+        } 
+    }
+    private async Task ProcessMessage(ITelegramBotClient botClient, Message message, Update update, CancellationToken cancellationToken)
     {
         try
         {
@@ -80,13 +156,11 @@ public class UpdateHandler : IUpdateHandler
                 await SendRegisteredMenu(botClient, message.Chat.Id, cancellationToken);
             }
 
-            await ProcessCommand(botClient, message, cancellationToken);
+            await ProcessCommand(botClient, message, update, cancellationToken); // Все аргументы на месте
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Ошибка при обработке сообщения: {ex.Message}");
-            Console.WriteLine(ex.StackTrace); // выводит полную трассировку ошибки
-
             await botClient.SendMessage(message.Chat.Id, "Что-то пошло не так. Попробуйте ещё раз позже.", cancellationToken: cancellationToken);
         }
     }
@@ -104,7 +178,7 @@ public class UpdateHandler : IUpdateHandler
             replyMarkup: KeyboardHelper.CreateRegisteredButtons(), cancellationToken: cancellationToken);
     }
 
-    private async Task ProcessCommand(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+    private async Task ProcessCommand(ITelegramBotClient botClient, Message message, Update update, CancellationToken cancellationToken)
     {
         if (message.Text.StartsWith('/'))
         {
@@ -148,7 +222,10 @@ public class UpdateHandler : IUpdateHandler
             {
                 case "/help": await OnHelp(message, user, cancellationToken); break;
                 case "/info": await OnInfo(message, user, cancellationToken); break;
-                case "/addtask": await OnAddTask(message, user, argument, cancellationToken); break;
+                case "/addtask":
+                    var addTaskContext = new ScenarioContext(message.From.Id, ScenarioType.AddTask);
+                    await ProcessScenario(addTaskContext, update, cancellationToken); // Передаем update сюда
+                    break;
                 case "/showtasks": await OnShowTasks(message, user, cancellationToken); break;
                 case "/removetask": await OnRemoveTask(message, user, argument, cancellationToken); break;
                 case "/completetask": await OnCompleteTask(message, user, argument, cancellationToken); break;
@@ -157,13 +234,13 @@ public class UpdateHandler : IUpdateHandler
                 case "/find": await OnFind(message, user, argument, cancellationToken); break;
                 default:
                     await botClient.SendMessage(message.Chat.Id, "Не распознана команда. Используйте /help для просмотра доступных команд.",
-                    cancellationToken: cancellationToken); break;
+                                              cancellationToken: cancellationToken); break;
             }
         }
         else
         {
             await botClient.SendMessage(message.Chat.Id, "Команды должны начинаться с символа '/', введите правильную команду.",
-                cancellationToken: cancellationToken);
+                                      cancellationToken: cancellationToken);
         }
     }
 
@@ -193,34 +270,34 @@ public class UpdateHandler : IUpdateHandler
 
     private async Task OnInfo(Message message, ToDoUser? user, CancellationToken cancellationToken)
     {
-        await _botClient.SendMessage(message.Chat.Id, "Этот бот помогает вам управлять вашими задачами и получает отчёты о ваших делах.",
-            cancellationToken: cancellationToken);
+        await _botClient.SendMessage(message.Chat.Id, "Этот бот помогает вам управлять вашими задачами и получать отчеты о ваших делах.",
+                                     cancellationToken: cancellationToken);
     }
 
-    private async Task OnAddTask(Message message, ToDoUser user, string? taskName, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(taskName))
-        {
-            await _botClient.SendMessage(message.Chat.Id, "Имя задачи не должно быть пустым.", cancellationToken: cancellationToken);
-            return;
-        }
+    //private async Task OnAddTask(Message message, ToDoUser user, string? taskName, CancellationToken cancellationToken)
+    //{
+    //    if (string.IsNullOrWhiteSpace(taskName))
+    //    {
+    //        await _botClient.SendMessage(message.Chat.Id, "Имя задачи не должно быть пустым.", cancellationToken: cancellationToken);
+    //        return;
+    //    }
 
-        try
-        {
-            var addedItem = await _toDoService.AddAsync(user, taskName!, cancellationToken);
-          
-            var safeTaskName = EscapeMarkdownCharacters(addedItem.Name);
-            await _botClient.SendMessage(message.Chat.Id,
-                                                $"Задача добавлена: {safeTaskName} - {addedItem.CreatedAt} - `{addedItem.Id}`",
-                                                parseMode: ParseMode.Markdown, 
-                                                cancellationToken: cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            await _botClient.SendMessage(message.Chat.Id, $"Ошибка добавления задачи: {ex.Message}",
-                                                  cancellationToken: cancellationToken);
-        }
-    }
+    //    try
+    //    {
+    //        var addedItem = await _toDoService.AddAsync(user, taskName!, deadline, cancellationToken);
+
+    //        var safeTaskName = EscapeMarkdownCharacters(addedItem.Name);
+    //        await _botClient.SendMessage(message.Chat.Id,
+    //                                    $"Задача добавлена: {safeTaskName} - {addedItem.CreatedAt} - `{addedItem.Id}`",
+    //                                    parseMode: ParseMode.Markdown,
+    //                                    cancellationToken: cancellationToken);
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        await _botClient.SendMessage(message.Chat.Id, $"Ошибка добавления задачи: {ex.Message}",
+    //                                      cancellationToken: cancellationToken);
+    //    }
+    //}
 
     private async Task OnShowTasks(Message message, ToDoUser user, CancellationToken cancellationToken)
     {
@@ -245,8 +322,7 @@ public class UpdateHandler : IUpdateHandler
             await _botClient.SendMessage(message.Chat.Id, "Что-то пошло не так при показе задач. Попробуйте снова.", cancellationToken: cancellationToken);
         }
     }
-
-    private async Task OnRemoveTask(Message message, ToDoUser user, string? taskIdStr, CancellationToken cancellationToken)
+        private async Task OnRemoveTask(Message message, ToDoUser user, string? taskIdStr, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(taskIdStr))
         {
@@ -272,7 +348,7 @@ public class UpdateHandler : IUpdateHandler
         }
     }
 
-       private async Task OnCompleteTask(Message message, ToDoUser user, string? taskIdStr, CancellationToken cancellationToken)
+    private async Task OnCompleteTask(Message message, ToDoUser user, string? taskIdStr, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(taskIdStr))
         {

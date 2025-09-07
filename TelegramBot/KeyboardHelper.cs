@@ -6,19 +6,11 @@ public class KeyboardHelper
     {
         return new InlineKeyboardMarkup(new[]
         {
-            InlineKeyboardButton.WithCallbackData("/start", "/start"),
-        });
-    }
-
-    public static InlineKeyboardMarkup reateRegisteredButtons()
-    {
-        return new InlineKeyboardMarkup(new[]
-        {
             InlineKeyboardButton.WithCallbackData("/start", "/start")
         });
     }
 
-    public static ReplyKeyboardMarkup CreateRegisteredButtons()
+        public static ReplyKeyboardMarkup CreateRegisteredButtons()
     {
         return new ReplyKeyboardMarkup(new[]
         {
@@ -30,4 +22,5 @@ public class KeyboardHelper
             ResizeKeyboard = true
         };
     }
+   
 }

@@ -8,7 +8,7 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        
+
         // Получаем токен бота из переменных окружения операционной системы
         string token = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN");
 
@@ -61,8 +61,12 @@ class Program
         var userService = new UserService(userRepo);           // Работа с пользователями
         var toDoReportService = new ToDoReportService(todoRepo);// Генерация отчетов по задачам
 
+        // Создаем репозиторий контекстов
+        var contextRepository = new InMemoryScenarioContextRepository(); // создается экземпляр репозитория контекстов
+
+
         // Создаем обработчик обновлений, передавая сервисы и репозитории
-        var handler = new UpdateHandler(botClient, userService, toDoService, todoRepo, toDoReportService);
+        var handler = new UpdateHandler(botClient, userService, toDoService, todoRepo, toDoReportService, contextRepository);
 
         // Подписываемся на события начала и завершения обработки обновлений
         handler.OnHandleUpdateStarted += msg => Console.WriteLine($"Началась обработка сообщения '{msg}'");
@@ -91,8 +95,8 @@ class Program
             // Начинаем получать обновления от Telegram сервера
             botClient.StartReceiving(handler.HandleUpdateAsync, handler.HandleErrorAsync, receiverOptions, cts.Token);
 
-               // Запрашиваем информацию о нашем боте
-        var me = await botClient.GetMe();
+            // Запрашиваем информацию о нашем боте
+            var me = await botClient.GetMe();
             Console.WriteLine($"{me.Username} запущен"); // Сообщаем, что бот успешно запустился
             Console.WriteLine("Нажмите A для выхода."); // Инструкция для остановки бота
 

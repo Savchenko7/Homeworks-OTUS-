@@ -21,7 +21,7 @@
         return await _toDoRepository.GetActiveByUserIdAsync(userId, cancellationToken);
     }
 
-    public async Task<ToDoItem> AddAsync(ToDoUser user, string name, CancellationToken cancellationToken)
+    public async Task<ToDoItem> AddAsync(ToDoUser user, string name, DateTime deadline, CancellationToken cancellationToken)
     {
         if (name.Length > _maxTaskNameLength)
             throw new TaskLengthLimitException(_maxTaskNameLength);
@@ -38,7 +38,8 @@
             ToDoUser = user,
             Name = name,
             CreatedAt = DateTime.UtcNow,
-            State = ToDoItemState.Active
+            State = ToDoItemState.Active,
+            Deadline = deadline // Задание срока выполнения
         };
 
         await _toDoRepository.AddAsync(todo, cancellationToken);
